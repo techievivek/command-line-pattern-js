@@ -169,7 +169,7 @@ class Application {
           case 'A': {
               const name = readlineSync.question("Enter the user's name \n");
               const balance = readlineSync.question('Enter the inital amount \n');
-              commandHistory.addCommand(sheet, {type: 1, name: name, balance: Number.parseFloat(balance)});
+              commandHistory.addCommand(sheet, {type: 1, name: name.toUpperCase(), balance: Number.parseFloat(balance)});
               break;
           }
           case 'S': {
@@ -180,12 +180,12 @@ class Application {
               const fromName = readlineSync.question('Please enter the name of the customer from whom you want to transfer amount \n');
               const toName = readlineSync.question('Please enter the name of the customer to whom you want to transfer amount \n');
               const transferAmount = readlineSync.question('Please enter the amount you want to trasfer. \n');
-              commandHistory.addCommand(sheet, {type: 2, fromName: fromName, toName: toName, transferAmount : Number.parseFloat(transferAmount)});
+              commandHistory.addCommand(sheet, {type: 2, fromName: fromName.toUpperCase(), toName: toName.toUpperCase(), transferAmount : Number.parseFloat(transferAmount)});
               break;
           }
           case 'D': {
               const name = readlineSync.question('Please enter the name of the customer you want to delete \n');
-              commandHistory.addCommand(sheet, {type: 0, name: name});
+              commandHistory.addCommand(sheet, {type: 0, name: name.toUpperCase()});
               break;
           }
           case 'U' : { 
