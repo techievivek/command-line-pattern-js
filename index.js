@@ -1,6 +1,6 @@
 var readlineSync = require('readline-sync');
 
-class Users {
+class User {
     constructor(name, balance) {
         this.name = name;
         this.balance = balance;
@@ -11,58 +11,86 @@ class CommandHistory {
     constructor() {
         this.commands = [];
     }
-    addCommand(expenseSheet, commandDetails) {
-        let commandExecutedSuccessfully = false;
-        if (commandDetails.type === 0) {
-            let balanceAmount = expenseSheet.getBalance(commandDetails.name);
-            commandDetails.balance = balanceAmount;
-            commandExecutedSuccessfully = expenseSheet.deleteEntry(commandDetails.name);
-        } else if (commandDetails.type === 1) {
-            commandExecutedSuccessfully = expenseSheet.addAnEntry(commandDetails.name, commandDetails.balance);
-        } else if (commandDetails.type === 2) {
-            commandExecutedSuccessfully = expenseSheet.transferAmount(commandDetails.fromName, commandDetails.toName, commandDetails.transferAmount);
-        }
-        commandExecutedSuccessfully ? this.commands.push(commandDetails) : 'Please have a look at log message for the error.';
+
+    addCommand(cmd) {
+        this.commands.push(cmd);
     }
 
-    undoCommand(expenseSheet) {
-        let commandToUndo = this.commands.pop();
-        if (commandToUndo === undefined) {
-            console.log('Nothing to undo');
-            return;
-        }
-        if (commandToUndo.type === 0) {
-            expenseSheet.addAnEntry(commandToUndo.name, commandToUndo.balance);
-        } else if (commandToUndo.type === 1) {
-            expenseSheet.deleteEntry(commandToUndo.name);
-        } else if (commandToUndo.type === 2) {
-            expenseSheet.undoTransfer(commandToUndo.toName, commandToUndo.fromName, commandToUndo.transferAmount);
-        }
+    canUndo() {
+        return this.commands.length > 0;
+    }
 
+    undoCommand() {
+        let lastCommand = this.commands.pop();
+        lastCommand.undo();
     }
-    getSize() {
-        return this.commands.length;
-    }
-    getUndoOperation() {
-        let commandToUndo = this.commands[this.commands.length - 1];
-        if (commandToUndo.type === 0) {
-            return `(U)ndo deletion of user ${commandToUndo.name}`;
-        } else if (commandToUndo.type === 1) {
-            return `(U)ndo Adding of new user ${commandToUndo.name}`;
-        } else if (commandToUndo.type === 2) {
-            return `(U)ndo transfer of amount ${commandToUndo.transferAmount} from ${commandToUndo.fromName} to ${commandToUndo.toName}`;
-        }
+
+    getUndoDescription() {
+        return this.commands[this.commands.length - 1].desc;
     }
 }
+
+class UndoCommand {
+    constructor(desc) {
+        this.desc = desc;
+    }
+}
+
+class UndoAddNewUser extends UndoCommand {
+    constructor(sheet, name) {
+        super('Undo Add User ' + name);
+        this.name = name;
+        this.sheet = sheet;
+    }
+    undo() {
+        this.sheet.deleteEntry(this.name);
+    }
+
+}
+
+
+class DeleteUndoCommand extends UndoCommand {
+
+    constructor(sheet, userObj, index) {
+        super('Undo Delete of User ' + userObj.name);
+        this.sheet = sheet;
+        this.userObj = userObj;
+        this.index = index;
+    }
+
+    undo() {
+        this.sheet.addUserObjectAtIndex(this.userObj, this.index);
+    }
+
+}
+
+class TransferUndoCommand extends UndoCommand {
+    constructor(sheet, fromName, toName, amount) {
+        super('Undo transfer of money from' + fromName + ' to ' + toName);
+        this.fromName = fromName;
+        this.sheet = sheet;
+        this.toName = toName;
+        this.amount = amount;
+    }
+    undo() {
+        this.sheet.undoTransfer(this.toName, this.fromName, this.amount);
+    }
+}
+
 
 class ExpenseSheet {
     constructor() {
         this.entries = [];
     }
+
+    addUserObjectAtIndex(userObj, index) {
+        this.entries.splice(index, 0, userObj);
+    }
+
     addAnEntry(name, balance) {
         let userIndex = this.entries.findIndex((entry) => entry.name === name);
         if (userIndex === -1) {
-            let newUser = new Users(name, balance);
+            let newUser = new User(name, balance);
             this.entries.push(newUser);
             console.log('New entry has been added successfully');
             return true;
@@ -71,9 +99,11 @@ class ExpenseSheet {
             return false;
         }
     }
+
     showAllEntry() {
         console.table(this.entries);
     }
+
     transferAmount(fromUser, toUser, amount) {
         let transferFrom = this.entries.find((entry) => entry.name === fromUser);
         let transferTo = this.entries.find((entry) => entry.name === toUser);
@@ -106,6 +136,7 @@ class ExpenseSheet {
             return false;
         }
     }
+
     deleteEntry(name) {
         let userIndex = this.entries.findIndex((entry) => entry.name === name);
         if (userIndex !== -1) {
@@ -118,6 +149,12 @@ class ExpenseSheet {
             return false;
         }
     }
+
+    getUserAndIndex(name) {
+        let index = this.entries.findIndex((entry) => entry.name === name);
+        return [this.entries[index], index];
+    }
+
     getBalance(name) {
         let userIndex = this.entries.findIndex((entry) => entry.name === name);
         if (userIndex !== -1) {
@@ -126,6 +163,7 @@ class ExpenseSheet {
             return 0;
         }
     }
+
     undoTransfer(fromUser, toUser, amount) {
         let transferFrom = this.entries.find((entry) => entry.name === fromUser);
         let transferTo = this.entries.find((entry) => entry.name === toUser);
@@ -158,9 +196,8 @@ class Application {
             console.log(`(S)how all entry`);
             console.log(`(T)ransfer to someone`);
             console.log(`(D)elete an entry`);
-            if (commandHistory.getSize() !== 0) {
-                let command = commandHistory.getUndoOperation();
-                console.log(command);
+            if (commandHistory.canUndo()) {
+                console.log('(U) ' + commandHistory.getUndoDescription());
             }
             console.log(`E(X)it the program`);
             choice = readlineSync.question('Please type a character to continue \n');
@@ -168,8 +205,9 @@ class Application {
             switch (choice) {
                 case 'A': {
                     const name = readlineSync.question("Enter the user's name \n");
-                    const balance = readlineSync.question('Enter the inital amount \n');
-                    commandHistory.addCommand(sheet, { type: 1, name: name.toUpperCase(), balance: Number.parseFloat(balance) });
+                    const balance = readlineSync.question('Enter the initial amount \n');
+                    sheet.addAnEntry(name, Number.parseFloat(balance));
+                    commandHistory.addCommand(new UndoAddNewUser(sheet, name));
                     break;
                 }
                 case 'S': {
@@ -180,16 +218,26 @@ class Application {
                     const fromName = readlineSync.question('Please enter the name of the customer from whom you want to transfer amount \n');
                     const toName = readlineSync.question('Please enter the name of the customer to whom you want to transfer amount \n');
                     const transferAmount = readlineSync.question('Please enter the amount you want to trasfer. \n');
-                    commandHistory.addCommand(sheet, { type: 2, fromName: fromName.toUpperCase(), toName: toName.toUpperCase(), transferAmount: Number.parseFloat(transferAmount) });
+                    sheet.transferAmount(fromName, toName, Number.parseFloat(transferAmount));
+                    commandHistory.addCommand(new TransferUndoCommand(sheet, fromName, toName, Number.parseFloat(transferAmount)));
                     break;
                 }
                 case 'D': {
                     const name = readlineSync.question('Please enter the name of the customer you want to delete \n');
-                    commandHistory.addCommand(sheet, { type: 0, name: name.toUpperCase() });
+                    const [userObj, index] = sheet.getUserAndIndex(name);
+                    if (userObj) {
+                        sheet.deleteEntry(name);
+                        commandHistory.addCommand(new DeleteUndoCommand(sheet, userObj, index));
+                    }
+                    else {
+                        console.log(`${name} doesn't seem to be registered with us.`);
+                    }
                     break;
                 }
                 case 'U': {
-                    commandHistory.undoCommand(sheet);
+                    if (commandHistory.canUndo()) {
+                        commandHistory.undoCommand();
+                    }
                     break;
                 }
                 default: {
