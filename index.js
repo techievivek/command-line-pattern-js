@@ -66,7 +66,7 @@ class DeleteUndoCommand extends UndoCommand {
 
 class TransferUndoCommand extends UndoCommand {
     constructor(sheet, fromName, toName, amount) {
-        super('Undo transfer of money from' + fromName + ' to ' + toName);
+        super('Undo transfer of money from ' + fromName + ' to ' + toName);
         this.fromName = fromName;
         this.sheet = sheet;
         this.toName = toName;
@@ -117,7 +117,7 @@ class ExpenseSheet {
                     return false;
                 }
                 if (transferFrom.name === transferTo.name) {
-                    console.log('Fromuser and Touser is same');
+                    console.log('fromUser and toUser is same');
                     return false;
                 }
                 if (transferFrom.balance >= amount) {
@@ -238,6 +238,10 @@ class Application {
                     if (commandHistory.canUndo()) {
                         commandHistory.undoCommand();
                     }
+                    break;
+                }
+                case 'X': {
+                    console.log('Exiting the program');
                     break;
                 }
                 default: {
